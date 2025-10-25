@@ -1,5 +1,9 @@
 import Foundation
 
+protocol ProductRepositoryProtocol {
+    func fetchProduct(by barcode: String) async throws -> ProductResponse
+}
+
 final class ProductRepository: ProductRepositoryProtocol {
     private let network: NetworkEngineProtocol
     

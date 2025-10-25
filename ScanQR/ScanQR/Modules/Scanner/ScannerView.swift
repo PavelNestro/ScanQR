@@ -5,23 +5,30 @@ struct ScannerView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var coordinator: AppCoordinator
     @StateObject private var viewModel: ScannerViewModel
-    
+
     init() {
+        let cameraService = CameraService()
+        let repository = CodeRepository(context: PersistenceController.shared.container.viewContext)
         _viewModel = StateObject(
             wrappedValue: ScannerViewModel(
-                context: PersistenceController.shared.container.viewContext
+                cameraService: cameraService,
+                repository: repository
             )
         )
     }
-    
+
     var body: some View {
         ZStack {
-            CameraPreviewView(session: viewModel.session)
+            // Камера
+            CameraPreviewView(session: viewModel.cameraService.session)
                 .ignoresSafeArea()
-            
+
+            // Зелёная рамка
             Rectangle()
                 .strokeBorder(Color.green, lineWidth: 3)
                 .frame(width: 250, height: 250)
+
+            // Фонарик
             VStack {
                 HStack {
                     Spacer()
@@ -39,7 +46,8 @@ struct ScannerView: View {
                 }
                 Spacer()
             }
-            
+
+            // Баннер с QR-ссылкой
             if viewModel.showLinkBanner, let url = viewModel.detectedURL {
                 VStack {
                     Spacer()
@@ -76,12 +84,14 @@ struct ScannerView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.showLinkBanner)
             }
         }
-        // MARK: Ошибки
+
+        // MARK: - Alerts
         .alert("Ошибка", isPresented: $viewModel.showError) {
             Button("ОК", role: .cancel) { }
         } message: {
             Text(viewModel.errorMessage ?? "")
-        }.alert("Нет доступа к камере", isPresented: $viewModel.showSettingsAlert) {
+        }
+        .alert("Нет доступа к камере", isPresented: $viewModel.showSettingsAlert) {
             Button("Открыть настройки") {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString),
                    UIApplication.shared.canOpenURL(settingsURL) {
@@ -103,17 +113,14 @@ struct ScannerView: View {
         } message: {
             Text("Введите название для сохранённого кода")
         }
-        
-        // MARK: Жизненный цикл
+
+        // MARK: - Жизненный цикл
         .task {
             await viewModel.requestCameraPermission()
             viewModel.startSession()
         }
         .onDisappear {
             viewModel.stopSession()
-        }
-        .onAppear {
-            viewModel.setContext(viewContext)
         }
     }
 }
